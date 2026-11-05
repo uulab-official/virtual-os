@@ -35,6 +35,7 @@ pub mod methods {
     pub const VM_CLONE: &str = "vm.clone";
     pub const VM_MODIFY: &str = "vm.modify";
     pub const VM_LOGS: &str = "vm.logs";
+    pub const VM_INSTALL: &str = "vm.install";
     pub const VM_SAVE: &str = "vm.save";
     pub const VM_RESTORE: &str = "vm.restore";
 
@@ -48,6 +49,7 @@ pub mod methods {
     pub const DISK_RESIZE: &str = "disk.resize";
     pub const DISK_REMOVE: &str = "disk.remove";
     pub const DISK_CLONE: &str = "disk.clone";
+    pub const DISK_COMPACT: &str = "disk.compact";
 
     pub const EVENT_POLL: &str = "events.poll";
 }
@@ -333,6 +335,12 @@ pub struct VmRestoreParams {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VmInstallParams {
+    pub name: String,
+    pub restore_image: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogsParams {
     pub name: String,
     #[serde(default = "default_log_lines")]
@@ -401,6 +409,12 @@ pub struct DiskRemoveParams {
     pub disk: String,
     #[serde(default)]
     pub delete: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiskCompactParams {
+    pub vm: String,
+    pub disk: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

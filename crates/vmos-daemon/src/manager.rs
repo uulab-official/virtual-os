@@ -384,6 +384,40 @@ impl Daemon {
         self.get(name)
     }
 
+    pub fn install_macos(&self, name: &str, restore_image: &Path) -> Result<VmGetResult, DaemonError> {
+        let _ops = self.lock_ops();
+        let vm = self.store.open(name)?;
+        if let Some(machine) = self.machine(name) {
+            if machine.state().is_active() {
+                return Err(DaemonError::Core(vmos_core::CoreError::VmBusy {
+                    name: name.to_string(),
+                    state: machine.state().label().to_string(),
+                    action: "install",
+                }));
+            }
+            self.machines().remove(name);
+        }
+        self.write_runtime(&vm, RunState::Starting, None)?;
+        let spec = spec_for(&vm)?;
+        let machine = match VzMachine::new(spec, format!("com.uulab.vmos.vm.{name}")) {
+            Ok(machine) => Arc::new(machine),
+            Err(error) => {
+                let message = error.to_string();
+                self.write_runtime(&vm, RunState::Error, Some(message.clone()))?;
+                return Err(error.into());
+            }
+        };
+        if let Err(error) = machine.install_macos(restore_image) {
+            let message = error.to_string();
+            self.write_runtime(&vm, RunState::Error, Some(message.clone()))?;
+            return Err(error.into());
+        }
+        // Installation leaves the VM stopped; persist that state.
+        self.write_runtime(&vm, RunState::Stopped, None)?;
+        tracing::info!(vm = name, "macOS installation completed");
+        self.get(name)
+    }
+
     pub fn logs(&self, name: &str, lines: usize) -> Result<LogsResult, DaemonError> {
         let vm = self.store.open(name)?;
         let path = vm.serial_log_path();
@@ -513,6 +547,18 @@ impl Daemon {
             read_only: disk.read_only,
             present: false,
         })
+    }
+
+    pub fn disk_compact(&self, vm: &str, disk: &str) -> Result<DiskInfo, DaemonError> {
+        let _ops = self.lock_ops();
+        let mut vm = self.store.open(vm)?;
+        let disk_config = vm.compact_disk(disk)?;
+        let info = vm
+            .disk_infos()
+            .into_iter()
+            .find(|info| info.id == disk_config.id)
+            .ok_or_else(|| DaemonError::message("disk was compacted but cannot be inspected"))?;
+        Ok(info)
     }
 
     pub fn disk_clone(&self, params: DiskCloneParams) -> Result<DiskInfo, DaemonError> {

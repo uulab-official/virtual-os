@@ -20,7 +20,7 @@ use objc2::runtime::ProtocolObject;
 use objc2::AllocAnyThread;
 use objc2_foundation::{NSError, NSString, NSURL};
 use objc2_virtualization::{
-    VZVirtualMachine, VZVirtualMachineConfiguration, VZVirtualMachineState,
+    VZMacOSInstaller, VZVirtualMachine, VZVirtualMachineConfiguration, VZVirtualMachineState,
 };
 
 use crate::config::{self, VzSpec};
@@ -264,6 +264,60 @@ impl VzMachine {
     }
 
     /// Wait until the VM reaches `Stopped` (or `Error`).
+    /// Install macOS from a restore image onto a stopped VM.
+    pub fn install_macos(&self, restore_image: &Path) -> Result<(), VzError> {
+        let restore_path = restore_image.to_path_buf();
+        use std::sync::{Condvar, Mutex};
+        let result_slot = Arc::new(Mutex::new(None::<Result<(), String>>));
+        let condvar = Arc::new(Condvar::new());
+        let vm_addr = self.vm_addr();
+        let queue = self.queue.clone();
+        let slot_clone = Arc::clone(&result_slot);
+        let cond_clone = Arc::clone(&condvar);
+        queue.exec_async(move || {
+            let url = match crate::util::path_to_nsurl(&restore_path) {
+                Ok(url) => url,
+                Err(error) => {
+                    *slot_clone.lock().unwrap() = Some(Err(error.to_string()));
+                    cond_clone.notify_one();
+                    return;
+                }
+            };
+            // SAFETY: vm_addr is only dereferenced on this queue.
+            let vm = unsafe { &*(vm_addr as *const VZVirtualMachine) };
+            let installer = unsafe {
+                VZMacOSInstaller::initWithVirtualMachine_restoreImageURL(
+                    VZMacOSInstaller::alloc(),
+                    vm,
+                    &url,
+                )
+            };
+            let slot2 = Arc::clone(&slot_clone);
+            let cond2 = Arc::clone(&cond_clone);
+            let block = RcBlock::new(move |err: *mut NSError| {
+                let outcome = if err.is_null() {
+                    Ok(())
+                } else {
+                    Err(unsafe { framework_error("installing macOS", &*err) }.to_string())
+                };
+                *slot2.lock().unwrap() = Some(outcome);
+                cond2.notify_one();
+            });
+            unsafe { installer.installWithCompletionHandler(&block) };
+        });
+
+        let guard = condvar
+            .wait_timeout(result_slot.lock().unwrap(), Duration::from_secs(3600))
+            .unwrap();
+        let _ = guard;
+        let mut slot = result_slot.lock().unwrap();
+        match slot.take() {
+            Some(Ok(())) => Ok(()),
+            Some(Err(message)) => Err(VzError::Other(message)),
+            None => Err(VzError::timeout("installing macOS", Duration::from_secs(3600))),
+        }
+    }
+
     pub fn wait_for_stopped(&self, timeout: Duration) -> bool {
         self.cell
             .wait_until(timeout, |state| matches!(state, VmState::Stopped))

@@ -20,11 +20,11 @@ use serde_json::{json, Value};
 use vmos_client::error_codes;
 use vmos_client::methods;
 use vmos_client::protocol::{
-    DiskAddParams, DiskCloneParams, DiskListParams, DiskListResult, DiskRemoveParams,
-    DiskResizeParams, DiskResult, Empty, EventPollParams, LogsParams, PingResult, RpcError,
-    RpcRequest, RpcResponse, SnapshotCreateParams, SnapshotListParams, SnapshotNameParams,
-    VmCloneParams, VmCreateParams, VmDeleteParams, VmModifyParams, VmNameParams, VmRestoreParams,
-    VmSaveParams, VmStopParams, MAX_LINE_BYTES, PROTOCOL_VERSION,
+    DiskAddParams, DiskCloneParams, DiskCompactParams, DiskListParams, DiskListResult,
+    DiskRemoveParams, DiskResizeParams, DiskResult, Empty, EventPollParams, LogsParams, PingResult,
+    RpcError, RpcRequest, RpcResponse, SnapshotCreateParams, SnapshotListParams, SnapshotNameParams,
+    VmCloneParams, VmCreateParams, VmDeleteParams, VmInstallParams, VmModifyParams, VmNameParams,
+    VmRestoreParams, VmSaveParams, VmStopParams, MAX_LINE_BYTES, PROTOCOL_VERSION,
 };
 use vmos_core::{EventKind, VmStore};
 
@@ -438,6 +438,14 @@ fn dispatch(daemon: &Arc<Daemon>, method: &str, params: Value) -> Result<Dispatc
                     .map_err(|error| error.to_rpc_error())?,
             )?
         }
+        methods::VM_INSTALL => {
+            let params: VmInstallParams = parse_params(params)?;
+            to_value(
+                daemon
+                    .install_macos(&params.name, &params.restore_image)
+                    .map_err(|error| error.to_rpc_error())?,
+            )?
+        }
         methods::VM_LOGS => {
             let params: LogsParams = parse_params(params)?;
             to_value(
@@ -530,6 +538,14 @@ fn dispatch(daemon: &Arc<Daemon>, method: &str, params: Value) -> Result<Dispatc
             to_value(DiskResult {
                 disk: daemon
                     .disk_clone(params)
+                    .map_err(|error| error.to_rpc_error())?,
+            })?
+        }
+        methods::DISK_COMPACT => {
+            let params: DiskCompactParams = parse_params(params)?;
+            to_value(DiskResult {
+                disk: daemon
+                    .disk_compact(&params.vm, &params.disk)
                     .map_err(|error| error.to_rpc_error())?,
             })?
         }

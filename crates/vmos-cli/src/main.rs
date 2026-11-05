@@ -123,6 +123,10 @@ enum Commands {
         #[arg(long, default_value_t = 200)]
         lines: usize,
     },
+    Install {
+        name: String,
+        restore_image: PathBuf,
+    },
     Save {
         name: String,
         path: PathBuf,
@@ -210,6 +214,10 @@ enum DiskCommands {
         vm: String,
         disk: String,
         target: PathBuf,
+    },
+    Compact {
+        vm: String,
+        disk: String,
     },
 }
 
@@ -494,6 +502,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Commands::Logs { name, lines } => cmd_logs(&cli, name, *lines),
         Commands::Save { name, path } => cmd_save(&cli, name, path),
         Commands::Restore { name, path } => cmd_restore(&cli, name, path),
+        Commands::Install { name, restore_image } => cmd_install(&cli, name, restore_image),
         Commands::Snapshot { .. } => cmd_snapshot(&cli, &cli.command),
         Commands::Disk { .. } => cmd_disk(&cli, &cli.command),
         Commands::Daemon { .. } => cmd_daemon(&cli, &cli.command),
@@ -697,6 +706,17 @@ fn cmd_restore(cli: &Cli, name: &str, path: &Path) -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+fn cmd_install(cli: &Cli, name: &str, restore_image: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let mut client = ensure_daemon(cli)?;
+    let params = vmos_client::VmInstallParams {
+        name: name.to_string(),
+        restore_image: restore_image.to_path_buf(),
+    };
+    let result: vmos_client::VmGetResult = client.call_long("vm.install", &params)?;
+    println!("{}: {}", result.vm.name, result.vm.state);
+    Ok(())
+}
+
 fn cmd_logs(cli: &Cli, name: &str, lines: usize) -> Result<(), Box<dyn std::error::Error>> {
     let mut client = ensure_daemon(cli)?;
     let result: vmos_client::LogsResult = client.call(
@@ -840,6 +860,15 @@ fn cmd_disk(cli: &Cli, command: &Commands) -> Result<(), Box<dyn std::error::Err
             };
             let result: vmos_client::DiskResult = client.call_long("disk.clone", &params)?;
             println!("cloned disk {} to {}", result.disk.id, target.display());
+        }
+        DiskCommands::Compact { vm, disk } => {
+            let mut client = ensure_daemon(cli)?;
+            let params = vmos_client::DiskCompactParams {
+                vm: vm.clone(),
+                disk: disk.clone(),
+            };
+            let result: vmos_client::DiskResult = client.call_long("disk.compact", &params)?;
+            println!("compacted disk {}", result.disk.id);
         }
     }
     Ok(())

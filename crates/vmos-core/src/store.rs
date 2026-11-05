@@ -861,6 +861,19 @@ impl Vm {
         Ok(existing)
     }
 
+    pub fn compact_disk(&mut self, id: &str) -> Result<DiskConfig> {
+        self.ensure_stopped("compact a disk")?;
+        let _lock = self.lock()?;
+        let existing = self
+            .config
+            .disk(id)
+            .cloned()
+            .ok_or_else(|| CoreError::DiskNotFound(id.to_string()))?;
+        let path = existing.resolve(&self.dir);
+        crate::disk::compact(&path)?;
+        Ok(existing)
+    }
+
     /// Clone one attached disk to a standalone image file.
     pub fn clone_disk(&self, id: &str, target: &Path) -> Result<DiskInfo> {
         self.ensure_stopped("clone a disk")?;
