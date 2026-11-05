@@ -26,7 +26,7 @@ use objc2_virtualization::{
     VZVirtioSocketDeviceConfiguration, VZVirtioSoundDeviceConfiguration,
     VZVirtioSoundDeviceInputStreamConfiguration, VZVirtioSoundDeviceOutputStreamConfiguration,
     VZVirtioSoundDeviceStreamConfiguration, VZVirtioTraditionalMemoryBalloonDeviceConfiguration,
-    VZVirtualMachineConfiguration, VZVmnetNetworkDeviceAttachment, VZXHCIControllerConfiguration,
+    VZVirtualMachineConfiguration, VZXHCIControllerConfiguration,
 };
 
 use crate::error::{exception_error, framework_error, VzError};
@@ -467,10 +467,7 @@ fn install_networks(spec: &VzSpec, config: &VZVirtualMachineConfiguration) -> Re
                 unsafe { device.setAttachment(Some(&attachment)) };
             }
             VzNetworkMode::Vmnet => {
-                // SAFETY: default vmnet attachment construction is valid.
-                let attachment = unsafe { VZVmnetNetworkDeviceAttachment::new() };
-                // SAFETY: valid attachment.
-                unsafe { device.setAttachment(Some(&attachment)) };
+                return Err(VzError::Unsupported);
             }
         }
 

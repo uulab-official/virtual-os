@@ -6,6 +6,7 @@ members = [
     "crates/vmos-client",
     "crates/vmos-daemon",
     "crates/vmos-cli",
+    "crates/vmos-gui",
     "crates/vmos-sdk",
 ]
 

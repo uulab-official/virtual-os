@@ -435,7 +435,7 @@ fn cmd_create(cli: &Cli, args: &Commands) -> Result<(), Box<dyn std::error::Erro
             };
             (NetworkMode::Bridged { interface: iface }, None)
         } else if spec == "vmnet" {
-            (NetworkMode::Vmnet, None)
+            return Err("vmnet mode is not supported on this build".into());
         } else {
             (NetworkMode::Nat, None)
         };

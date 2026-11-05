@@ -42,6 +42,7 @@ Crates:
 - `vmos-client` — wire protocol and blocking JSON-RPC client.
 - `vmos-daemon` — one daemon per store, owns all running VMs.
 - `vmos-cli` — the `vmos` command.
+- `vmos-gui` — a desktop GUI (eframe/egui) for managing VMs.
 - `vmos-sdk` — C ABI (`libvmos_sdk`).
 
 ## Quick start
