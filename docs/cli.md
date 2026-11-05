@@ -22,6 +22,9 @@ vmos delete NAME [--force]
 vmos clone SOURCE TARGET
 vmos modify NAME [--cpus N] [--memory MiB]
 vmos logs NAME [--lines N]
+vmos save NAME PATH
+vmos restore NAME PATH
+vmos install NAME RESTORE_IMAGE
 ```
 
 ### `create` options
@@ -53,6 +56,7 @@ vmos disk add VM ID SIZE [--path PATH]
 vmos disk resize VM DISK SIZE
 vmos disk remove VM DISK [--delete]
 vmos disk clone VM DISK TARGET
+vmos disk compact VM DISK
 ```
 
 ## Daemon

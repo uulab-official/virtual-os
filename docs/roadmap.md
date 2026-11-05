@@ -3,6 +3,9 @@
 ## Done
 
 - VM config, store, runtime state, per-VM locks.
+- Device model: graphics, audio, USB, pointing, keyboard, balloon, vsock, entropy.
+- Saved state (save/restore) and macOS installer hook.
+- Disk compaction.
 - Raw disk create/resize/remove/clone.
 - Cold snapshots (config + disks + NVRAM + identifiers).
 - Linux direct boot, EFI boot, macOS boot model.
