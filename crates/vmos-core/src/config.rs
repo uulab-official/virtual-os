@@ -172,6 +172,8 @@ pub enum NetworkMode {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         interface: Option<String>,
     },
+    /// Logical vmnet network (shared/isolated topology managed by vmnet).
+    Vmnet,
 }
 
 impl NetworkMode {
@@ -182,6 +184,7 @@ impl NetworkMode {
                 Some(name) => format!("bridged:{name}"),
                 None => "bridged".to_string(),
             },
+            Self::Vmnet => "vmnet".to_string(),
         }
     }
 }

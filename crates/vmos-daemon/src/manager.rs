@@ -807,6 +807,7 @@ fn spec_for(vm: &Vm) -> Result<VzSpec, DaemonError> {
                 vmos_core::NetworkMode::Bridged { interface } => VzNetworkMode::Bridged {
                     interface: interface.clone(),
                 },
+                vmos_core::NetworkMode::Vmnet => VzNetworkMode::Vmnet,
             },
         })
         .collect();

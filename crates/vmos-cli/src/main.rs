@@ -422,6 +422,8 @@ fn cmd_create(cli: &Cli, args: &Commands) -> Result<(), Box<dyn std::error::Erro
                 Some(iface.to_string())
             };
             (NetworkMode::Bridged { interface: iface }, None)
+        } else if spec == "vmnet" {
+            (NetworkMode::Vmnet, None)
         } else {
             (NetworkMode::Nat, None)
         };

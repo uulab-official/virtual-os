@@ -26,7 +26,7 @@ use objc2_virtualization::{
     VZVirtioSocketDeviceConfiguration, VZVirtioSoundDeviceConfiguration,
     VZVirtioSoundDeviceInputStreamConfiguration, VZVirtioSoundDeviceOutputStreamConfiguration,
     VZVirtioSoundDeviceStreamConfiguration, VZVirtioTraditionalMemoryBalloonDeviceConfiguration,
-    VZVirtualMachineConfiguration, VZXHCIControllerConfiguration,
+    VZVirtualMachineConfiguration, VZVmnetNetworkDeviceAttachment, VZXHCIControllerConfiguration,
 };
 
 use crate::error::{exception_error, framework_error, VzError};
@@ -59,6 +59,7 @@ pub struct VzDisk {
 pub enum VzNetworkMode {
     Nat,
     Bridged { interface: Option<String> },
+    Vmnet,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -462,6 +463,12 @@ fn install_networks(spec: &VzSpec, config: &VZVirtualMachineConfiguration) -> Re
                         &interface,
                     )
                 };
+                // SAFETY: valid attachment.
+                unsafe { device.setAttachment(Some(&attachment)) };
+            }
+            VzNetworkMode::Vmnet => {
+                // SAFETY: default vmnet attachment construction is valid.
+                let attachment = unsafe { VZVmnetNetworkDeviceAttachment::new() };
                 // SAFETY: valid attachment.
                 unsafe { device.setAttachment(Some(&attachment)) };
             }
