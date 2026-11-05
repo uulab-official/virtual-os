@@ -2,7 +2,7 @@ use eframe::egui;
 use std::process::Command;
 use std::time::{Duration, Instant};
 use vmos_client::{Client, VmGetResult, VmListResult};
-use vmos_core::VmStore;
+use vmos_core::{VmStore};
 
 enum Pending {
     None,
@@ -11,7 +11,7 @@ enum Pending {
     Pause(String),
     Resume(String),
     Delete(String),
-    RefreshLogs,
+    Refresh,
 }
 
 struct VmosApp {
@@ -23,12 +23,15 @@ struct VmosApp {
     last_refresh: Instant,
     create_open: bool,
     snap_open: bool,
+    settings_open: bool,
     new_name: String,
     new_cpus: u32,
     new_memory: u64,
     new_boot: String,
     new_disk: String,
     snap_name: String,
+    edit_cpus: u32,
+    edit_memory: u64,
     logs: Vec<String>,
     events: Vec<String>,
 }
@@ -44,12 +47,15 @@ impl VmosApp {
             last_refresh: Instant::now(),
             create_open: false,
             snap_open: false,
+            settings_open: false,
             new_name: "new-vm".into(),
             new_cpus: 2,
             new_memory: 2048,
             new_boot: "efi".into(),
             new_disk: "root:32M".into(),
             snap_name: "snapshot-1".into(),
+            edit_cpus: 2,
+            edit_memory: 2048,
             logs: Vec::new(),
             events: Vec::new(),
         };
@@ -90,6 +96,8 @@ impl VmosApp {
             if let Some(name) = &self.selected {
                 let params = vmos_client::VmNameParams { name: name.clone() };
                 if let Ok(res) = client.call::<_, VmGetResult>("vm.get", &params) {
+                    self.edit_cpus = res.vm.config.cpus;
+                    self.edit_memory = res.vm.config.memory_mib;
                     self.details = Some(res);
                 }
                 let params = vmos_client::LogsParams { name: name.clone(), lines: 50 };
@@ -103,6 +111,22 @@ impl VmosApp {
             ) {
                 self.events = res.events.iter().map(|e| format!("{} {}", e.seq, serde_json::to_string(&e.kind).unwrap_or_default())).collect();
             }
+        }
+    }
+
+    fn action(&mut self, method: &str, name: &str) {
+        if let Some(client) = &mut self.client {
+            let params = vmos_client::VmNameParams { name: name.to_string() };
+            let res: Result<serde_json::Value, _> = if method == "vm.start" {
+                client.call_long::<_, serde_json::Value>(method, &params)
+            } else {
+                client.call::<_, serde_json::Value>(method, &params)
+            };
+            match res {
+                Ok(_) => self.status = format!("{method} ok"),
+                Err(err) => self.status = format!("{method} error: {err}"),
+            }
+            self.refresh();
         }
     }
 }
@@ -119,7 +143,7 @@ impl eframe::App for VmosApp {
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("virtual-os");
-                if ui.button("Refresh").clicked() { pending = Pending::RefreshLogs; }
+                if ui.button("Refresh").clicked() { pending = Pending::Refresh; }
                 if ui.button("New VM").clicked() { self.create_open = true; }
                 ui.label(&self.status);
             });
@@ -155,8 +179,10 @@ impl eframe::App for VmosApp {
                     if ui.button("Pause").clicked() { pending = Pending::Pause(name.clone()); }
                     if ui.button("Resume").clicked() { pending = Pending::Resume(name.clone()); }
                     if ui.button("Delete").clicked() { pending = Pending::Delete(name.clone()); }
+                    if ui.button("Settings").clicked() { self.settings_open = true; }
                     if ui.button("Snapshot").clicked() { self.snap_open = true; }
                 });
+
                 ui.separator();
                 ui.label("Disks:");
                 for disk in &details.vm.disks {
@@ -166,14 +192,14 @@ impl eframe::App for VmosApp {
                 for snap in &details.vm.snapshots {
                     ui.label(format!("  {} ({})", snap.name, snap.created_at));
                 }
+
                 ui.separator();
                 ui.label("Serial log (tail):");
-                egui::ScrollArea::vertical().max_height(100.0).show(ui, |ui| {
+                egui::ScrollArea::vertical().max_height(80.0).show(ui, |ui| {
                     for line in &self.logs { ui.monospace(line); }
                 });
-                ui.separator();
                 ui.label("Events:");
-                egui::ScrollArea::vertical().max_height(100.0).show(ui, |ui| {
+                egui::ScrollArea::vertical().max_height(80.0).show(ui, |ui| {
                     for e in &self.events { ui.monospace(e); }
                 });
             } else {
@@ -181,10 +207,9 @@ impl eframe::App for VmosApp {
             }
         });
 
-        // execute pending
         match pending {
             Pending::None => {}
-            Pending::RefreshLogs => self.refresh(),
+            Pending::Refresh => self.refresh(),
             Pending::Start(n) => self.action("vm.start", &n),
             Pending::Stop(n) => self.action("vm.stop", &n),
             Pending::Pause(n) => self.action("vm.pause", &n),
@@ -231,6 +256,29 @@ impl eframe::App for VmosApp {
             });
         }
 
+        if self.settings_open {
+            if let Some(name) = &self.selected {
+                let name = name.clone();
+                egui::Window::new("Settings").show(ctx, |ui| {
+                    ui.horizontal(|ui| { ui.label("CPUs:"); ui.add(egui::DragValue::new(&mut self.edit_cpus).range(1..=64)); });
+                    ui.horizontal(|ui| { ui.label("Memory (MiB):"); ui.add(egui::DragValue::new(&mut self.edit_memory).range(128..=131072)); });
+                    ui.horizontal(|ui| {
+                        if ui.button("Apply").clicked() {
+                            let params = vmos_client::VmModifyParams { name: name.clone(), cpus: Some(self.edit_cpus), memory_mib: Some(self.edit_memory) };
+                            if let Some(client) = &mut self.client {
+                                let _ = client.call::<_, serde_json::Value>("vm.modify", &params);
+                            }
+                            self.settings_open = false;
+                            self.refresh();
+                        }
+                        if ui.button("Cancel").clicked() { self.settings_open = false; }
+                    });
+                });
+            } else {
+                self.settings_open = false;
+            }
+        }
+
         if self.snap_open {
             if let Some(name) = self.selected.clone() {
                 egui::Window::new("Snapshot").show(ctx, |ui| {
@@ -250,24 +298,6 @@ impl eframe::App for VmosApp {
             } else {
                 self.snap_open = false;
             }
-        }
-    }
-}
-
-impl VmosApp {
-    fn action(&mut self, method: &str, name: &str) {
-        if let Some(client) = &mut self.client {
-            let params = vmos_client::VmNameParams { name: name.to_string() };
-            let res: Result<serde_json::Value, _> = if method == "vm.start" {
-                client.call_long::<_, serde_json::Value>(method, &params)
-            } else {
-                client.call::<_, serde_json::Value>(method, &params)
-            };
-            match res {
-                Ok(_) => self.status = format!("{method} ok"),
-                Err(err) => self.status = format!("{method} error: {err}"),
-            }
-            self.refresh();
         }
     }
 }
