@@ -23,6 +23,14 @@
 //!     serial: Some(VzSerial { path: PathBuf::from("/tmp/serial.log"), append: true }),
 //!     platform_identifier: None,
 //!     graphics: None,
+//!     audio: false,
+//!     usb: false,
+//!     pointing: vmos_vz::VzPointingKind::Usb,
+//!     keyboard: vmos_vz::VzKeyboardKind::Usb,
+//!     console_ports: vec![],
+//!     balloon: false,
+//!     socket: false,
+//!     entropy: true,
 //! };
 //! let machine = VzMachine::new(spec, "com.example.vmos")?;
 //! machine.start()?;
@@ -41,8 +49,9 @@ mod state;
 mod util;
 
 pub use config::{
-    bridged_interfaces, validate_share_tag, BridgedInterface, VzBoot, VzDisk, VzGraphics,
-    VzNetwork, VzNetworkMode, VzSerial, VzShare, VzSpec,
+    bridged_interfaces, validate_share_tag, BridgedInterface, VzBoot, VzConsolePort, VzDisk,
+    VzGraphics, VzKeyboardKind, VzNetwork, VzNetworkMode, VzPointingKind, VzSerial, VzShare,
+    VzSpec,
 };
 pub use error::VzError;
 pub use machine::{HostLimits, VzMachine};

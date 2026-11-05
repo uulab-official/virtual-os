@@ -93,6 +93,7 @@ pub struct CreateVmOptions {
     pub networks: Vec<NewNetwork>,
     pub shares: Vec<crate::config::ShareConfig>,
     pub serial: crate::config::SerialConfig,
+    pub devices: crate::config::DevicesConfig,
     pub tags: std::collections::BTreeMap<String, String>,
 }
 
@@ -108,6 +109,7 @@ impl CreateVmOptions {
             networks: vec![NewNetwork::nat()],
             shares: Vec::new(),
             serial: crate::config::SerialConfig::default(),
+            devices: crate::config::DevicesConfig::default(),
             tags: Default::default(),
         }
     }
@@ -149,6 +151,11 @@ impl CreateVmOptions {
 
     pub fn with_serial(mut self, serial: crate::config::SerialConfig) -> Self {
         self.serial = serial;
+        self
+    }
+
+    pub fn with_devices(mut self, devices: crate::config::DevicesConfig) -> Self {
+        self.devices = devices;
         self
     }
 }
@@ -350,6 +357,7 @@ impl VmStore {
             config.display_name = options.display_name.clone();
             config.tags = options.tags.clone();
             config.serial = options.serial.clone();
+            config.devices = options.devices.clone();
 
             // Generic platform identity for Linux and EFI guests, persisted so
             // the guest sees a stable machine identifier across boots.

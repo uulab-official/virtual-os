@@ -294,7 +294,205 @@ impl SerialConfig {
     }
 }
 
-/// Platform identity persisted between boots.
+/// Graphics device configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GraphicsConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_graphics_width")]
+    pub width: u32,
+    #[serde(default = "default_graphics_height")]
+    pub height: u32,
+    #[serde(default = "default_graphics_ppi")]
+    pub pixels_per_inch: u32,
+}
+
+impl Default for GraphicsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            width: 1920,
+            height: 1080,
+            pixels_per_inch: 80,
+        }
+    }
+}
+
+/// Audio device configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AudioConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub input: bool,
+    #[serde(default = "default_true")]
+    pub output: bool,
+}
+
+impl Default for AudioConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            input: true,
+            output: true,
+        }
+    }
+}
+
+/// USB controller configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UsbConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_true")]
+    pub autoconnect: bool,
+}
+
+impl Default for UsbConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            autoconnect: true,
+        }
+    }
+}
+
+/// Pointing device kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum PointingKind {
+    #[default]
+    Usb,
+    Trackpad,
+    None,
+}
+
+/// Pointing device configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PointingConfig {
+    #[serde(default)]
+    pub kind: PointingKind,
+}
+
+impl Default for PointingConfig {
+    fn default() -> Self {
+        Self {
+            kind: PointingKind::Usb,
+        }
+    }
+}
+
+/// Keyboard device kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum KeyboardKind {
+    #[default]
+    Usb,
+    Mac,
+    None,
+}
+
+/// Keyboard device configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KeyboardConfig {
+    #[serde(default)]
+    pub kind: KeyboardKind,
+}
+
+impl Default for KeyboardConfig {
+    fn default() -> Self {
+        Self {
+            kind: KeyboardKind::Usb,
+        }
+    }
+}
+
+/// A single virtio console port.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConsolePortConfig {
+    pub name: String,
+    /// Relative to the VM directory unless absolute.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub log: Option<PathBuf>,
+}
+
+/// Virtio console configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ConsoleConfig {
+    #[serde(default)]
+    pub ports: Vec<ConsolePortConfig>,
+}
+
+/// Host-guest socket device (vsock) configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SocketConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+impl Default for SocketConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
+/// Memory balloon device configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BalloonConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+impl Default for BalloonConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
+/// Aggregate device configuration for a VM.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct DevicesConfig {
+    #[serde(default)]
+    pub graphics: GraphicsConfig,
+    #[serde(default)]
+    pub audio: AudioConfig,
+    #[serde(default)]
+    pub usb: UsbConfig,
+    #[serde(default)]
+    pub pointing: PointingConfig,
+    #[serde(default)]
+    pub keyboard: KeyboardConfig,
+    #[serde(default)]
+    pub console: ConsoleConfig,
+    #[serde(default)]
+    pub socket: SocketConfig,
+    #[serde(default)]
+    pub balloon: BalloonConfig,
+    #[serde(default = "default_true")]
+    pub entropy: bool,
+}
+
+fn default_graphics_width() -> u32 {
+    1920
+}
+fn default_graphics_height() -> u32 {
+    1080
+}
+fn default_graphics_ppi() -> u32 {
+    80
+}
+
+/// Complete VM definition. This is the source of truth on disk.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformConfig {
@@ -326,6 +524,8 @@ pub struct VmConfig {
     #[serde(default)]
     pub serial: SerialConfig,
     #[serde(default)]
+    pub devices: DevicesConfig,
+    #[serde(default)]
     pub platform: PlatformConfig,
     #[serde(default)]
     pub tags: BTreeMap<String, String>,
@@ -349,6 +549,7 @@ impl VmConfig {
             networks: Vec::new(),
             shares: Vec::new(),
             serial: SerialConfig::default(),
+            devices: DevicesConfig::default(),
             platform: PlatformConfig::default(),
             tags: BTreeMap::new(),
         }

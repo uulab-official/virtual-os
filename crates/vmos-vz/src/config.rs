@@ -6,18 +6,27 @@ use objc2::rc::Retained;
 use objc2::AllocAnyThread;
 use objc2_foundation::{NSArray, NSData, NSString};
 use objc2_virtualization::{
-    VZBridgedNetworkDeviceAttachment, VZBridgedNetworkInterface, VZDiskImageCachingMode,
-    VZDiskImageStorageDeviceAttachment, VZDiskImageSynchronizationMode, VZEFIBootLoader,
-    VZEFIVariableStore, VZEFIVariableStoreInitializationOptions, VZFileSerialPortAttachment,
-    VZGenericMachineIdentifier, VZGenericPlatformConfiguration, VZGraphicsDeviceConfiguration,
-    VZLinuxBootLoader, VZMACAddress, VZMacAuxiliaryStorage, VZMacGraphicsDeviceConfiguration,
-    VZMacGraphicsDisplayConfiguration, VZMacHardwareModel, VZMacMachineIdentifier,
-    VZMacOSBootLoader, VZMacPlatformConfiguration, VZNATNetworkDeviceAttachment,
-    VZNetworkDeviceConfiguration, VZPlatformConfiguration, VZSerialPortConfiguration,
-    VZSharedDirectory, VZSingleDirectoryShare, VZStorageDeviceConfiguration,
-    VZVirtioBlockDeviceConfiguration, VZVirtioConsoleDeviceSerialPortConfiguration,
-    VZVirtioEntropyDeviceConfiguration, VZVirtioFileSystemDeviceConfiguration,
-    VZVirtioNetworkDeviceConfiguration, VZVirtualMachineConfiguration,
+    VZAudioDeviceConfiguration, VZBridgedNetworkDeviceAttachment, VZBridgedNetworkInterface,
+    VZDiskImageCachingMode, VZDiskImageStorageDeviceAttachment, VZDiskImageSynchronizationMode,
+    VZEFIBootLoader, VZEFIVariableStore, VZEFIVariableStoreInitializationOptions,
+    VZFileSerialPortAttachment, VZGenericMachineIdentifier, VZGenericPlatformConfiguration,
+    VZGraphicsDeviceConfiguration, VZHostAudioInputStreamSource, VZHostAudioOutputStreamSink,
+    VZKeyboardConfiguration, VZLinuxBootLoader, VZMACAddress, VZMacAuxiliaryStorage,
+    VZMacGraphicsDeviceConfiguration, VZMacGraphicsDisplayConfiguration, VZMacHardwareModel,
+    VZMacKeyboardConfiguration, VZMacMachineIdentifier, VZMacOSBootLoader,
+    VZMacPlatformConfiguration, VZMacTrackpadConfiguration, VZMemoryBalloonDeviceConfiguration,
+    VZNATNetworkDeviceAttachment, VZNetworkDeviceConfiguration, VZPlatformConfiguration,
+    VZPointingDeviceConfiguration, VZSerialPortConfiguration, VZSharedDirectory,
+    VZSingleDirectoryShare, VZSocketDeviceConfiguration, VZStorageDeviceConfiguration,
+    VZUSBControllerConfiguration, VZUSBKeyboardConfiguration,
+    VZUSBScreenCoordinatePointingDeviceConfiguration, VZVirtioBlockDeviceConfiguration,
+    VZVirtioConsoleDeviceSerialPortConfiguration, VZVirtioEntropyDeviceConfiguration,
+    VZVirtioFileSystemDeviceConfiguration, VZVirtioGraphicsDeviceConfiguration,
+    VZVirtioGraphicsScanoutConfiguration, VZVirtioNetworkDeviceConfiguration,
+    VZVirtioSocketDeviceConfiguration, VZVirtioSoundDeviceConfiguration,
+    VZVirtioSoundDeviceInputStreamConfiguration, VZVirtioSoundDeviceOutputStreamConfiguration,
+    VZVirtioSoundDeviceStreamConfiguration, VZVirtioTraditionalMemoryBalloonDeviceConfiguration,
+    VZVirtualMachineConfiguration, VZXHCIControllerConfiguration,
 };
 
 use crate::error::{exception_error, framework_error, VzError};
@@ -88,6 +97,26 @@ impl Default for VzGraphics {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VzPointingKind {
+    Usb,
+    Trackpad,
+    None,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VzKeyboardKind {
+    Usb,
+    Mac,
+    None,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VzConsolePort {
+    pub name: String,
+    pub log: Option<PathBuf>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VzSpec {
     pub cpus: u32,
@@ -99,6 +128,14 @@ pub struct VzSpec {
     pub serial: Option<VzSerial>,
     pub platform_identifier: Option<PathBuf>,
     pub graphics: Option<VzGraphics>,
+    pub audio: bool,
+    pub usb: bool,
+    pub pointing: VzPointingKind,
+    pub keyboard: VzKeyboardKind,
+    pub console_ports: Vec<VzConsolePort>,
+    pub balloon: bool,
+    pub socket: bool,
+    pub entropy: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -193,12 +230,22 @@ fn build_inner(spec: &VzSpec) -> Result<Retained<VZVirtualMachineConfiguration>,
     install_serial(spec, &config)?;
 
     // A virtio entropy device gives the guest a reliable /dev/random.
-    // SAFETY: default entropy device construction is valid.
-    let entropy = unsafe { VZVirtioEntropyDeviceConfiguration::new() };
-    let entropy_ref: &objc2_virtualization::VZEntropyDeviceConfiguration = &entropy;
-    let entropy_array = NSArray::from_slice(&[entropy_ref]);
-    // SAFETY: the array contains one valid entropy configuration.
-    unsafe { config.setEntropyDevices(&entropy_array) };
+    if spec.entropy {
+        // SAFETY: default entropy device construction is valid.
+        let entropy = unsafe { VZVirtioEntropyDeviceConfiguration::new() };
+        let entropy_ref: &objc2_virtualization::VZEntropyDeviceConfiguration = &entropy;
+        let entropy_array = NSArray::from_slice(&[entropy_ref]);
+        // SAFETY: the array contains one valid entropy configuration.
+        unsafe { config.setEntropyDevices(&entropy_array) };
+    }
+
+    install_graphics(spec, &config)?;
+    install_audio(spec, &config)?;
+    install_usb(spec, &config)?;
+    install_pointing(spec, &config)?;
+    install_keyboard(spec, &config)?;
+    install_balloon(spec, &config)?;
+    install_socket(spec, &config)?;
 
     // SAFETY: validateWithError reports configuration problems as an NSError.
     unsafe { config.validateWithError() }
@@ -252,7 +299,9 @@ fn install_platform(spec: &VzSpec, config: &VZVirtualMachineConfiguration) -> Re
             // SAFETY: platform is a VZMacPlatformConfiguration subclass.
             unsafe { config.setPlatform(platform_ref) };
 
-            install_mac_graphics(spec, config)?;
+            if spec.graphics.is_some() {
+                install_mac_graphics(spec, config)?;
+            }
         }
         _ => {
             // SAFETY: default generic platform construction is valid.
@@ -537,6 +586,159 @@ fn install_mac_graphics(
     let array = NSArray::from_slice(&[device_ref]);
     // SAFETY: array contains one valid graphics device.
     unsafe { config.setGraphicsDevices(&array) };
+    Ok(())
+}
+
+fn install_graphics(spec: &VzSpec, config: &VZVirtualMachineConfiguration) -> Result<(), VzError> {
+    let Some(graphics) = spec.graphics else {
+        return Ok(());
+    };
+    let _ = graphics;
+    if matches!(spec.boot, VzBoot::MacOs { .. }) {
+        return Ok(());
+    }
+    // SAFETY: scanout construction only uses plain integers.
+    let scanout = unsafe {
+        VZVirtioGraphicsScanoutConfiguration::initWithWidthInPixels_heightInPixels(
+            VZVirtioGraphicsScanoutConfiguration::alloc(),
+            graphics.width as isize,
+            graphics.height as isize,
+        )
+    };
+    let scanouts = NSArray::from_slice(&[&*scanout]);
+    // SAFETY: default virtio graphics device construction is valid.
+    let device = unsafe { VZVirtioGraphicsDeviceConfiguration::new() };
+    // SAFETY: array contains one valid scanout.
+    unsafe { device.setScanouts(&scanouts) };
+    let device_ref: &VZGraphicsDeviceConfiguration = &device;
+    let array = NSArray::from_slice(&[device_ref]);
+    // SAFETY: array contains one valid graphics device.
+    unsafe { config.setGraphicsDevices(&array) };
+    Ok(())
+}
+
+fn install_audio(spec: &VzSpec, config: &VZVirtualMachineConfiguration) -> Result<(), VzError> {
+    if !spec.audio {
+        return Ok(());
+    }
+    let mut retained_inputs: Vec<Retained<VZVirtioSoundDeviceInputStreamConfiguration>> =
+        Vec::new();
+    let mut retained_outputs: Vec<Retained<VZVirtioSoundDeviceOutputStreamConfiguration>> =
+        Vec::new();
+    let mut refs: Vec<&VZVirtioSoundDeviceStreamConfiguration> = Vec::new();
+
+    // SAFETY: default host audio source/sink construction is valid.
+    let input_stream = unsafe { VZVirtioSoundDeviceInputStreamConfiguration::new() };
+    let source = unsafe { VZHostAudioInputStreamSource::new() };
+    unsafe { input_stream.setSource(Some(&source)) };
+    retained_inputs.push(input_stream);
+    refs.push(retained_inputs.last().unwrap() as &VZVirtioSoundDeviceStreamConfiguration);
+
+    // SAFETY: default host audio sink construction is valid.
+    let output_stream = unsafe { VZVirtioSoundDeviceOutputStreamConfiguration::new() };
+    let sink = unsafe { VZHostAudioOutputStreamSink::new() };
+    unsafe { output_stream.setSink(Some(&sink)) };
+    retained_outputs.push(output_stream);
+    refs.push(retained_outputs.last().unwrap() as &VZVirtioSoundDeviceStreamConfiguration);
+
+    let stream_array = NSArray::from_slice(&refs);
+    // SAFETY: default virtio sound device construction is valid.
+    let device = unsafe { VZVirtioSoundDeviceConfiguration::new() };
+    // SAFETY: array contains valid stream configurations.
+    unsafe { device.setStreams(&stream_array) };
+    let device_ref: &VZAudioDeviceConfiguration = &device;
+    let array = NSArray::from_slice(&[device_ref]);
+    // SAFETY: array contains one valid audio device.
+    unsafe { config.setAudioDevices(&array) };
+
+    let _ = (retained_inputs, retained_outputs);
+    Ok(())
+}
+
+fn install_usb(spec: &VzSpec, config: &VZVirtualMachineConfiguration) -> Result<(), VzError> {
+    if !spec.usb {
+        return Ok(());
+    }
+    // SAFETY: default XHCI controller construction is valid.
+    let controller = unsafe { VZXHCIControllerConfiguration::new() };
+    let controller_ref: &VZUSBControllerConfiguration = &controller;
+    let array = NSArray::from_slice(&[controller_ref]);
+    // SAFETY: array contains one valid USB controller.
+    unsafe { config.setUsbControllers(&array) };
+    Ok(())
+}
+
+fn install_pointing(spec: &VzSpec, config: &VZVirtualMachineConfiguration) -> Result<(), VzError> {
+    match spec.pointing {
+        VzPointingKind::None => Ok(()),
+        VzPointingKind::Usb => {
+            // SAFETY: default USB pointing device construction is valid.
+            let device = unsafe { VZUSBScreenCoordinatePointingDeviceConfiguration::new() };
+            let device_ref: &VZPointingDeviceConfiguration = &device;
+            let array = NSArray::from_slice(&[device_ref]);
+            // SAFETY: array contains one valid pointing device.
+            unsafe { config.setPointingDevices(&array) };
+            Ok(())
+        }
+        VzPointingKind::Trackpad => {
+            // SAFETY: default trackpad construction is valid.
+            let device = unsafe { VZMacTrackpadConfiguration::new() };
+            let device_ref: &VZPointingDeviceConfiguration = &device;
+            let array = NSArray::from_slice(&[device_ref]);
+            // SAFETY: array contains one valid pointing device.
+            unsafe { config.setPointingDevices(&array) };
+            Ok(())
+        }
+    }
+}
+
+fn install_keyboard(spec: &VzSpec, config: &VZVirtualMachineConfiguration) -> Result<(), VzError> {
+    match spec.keyboard {
+        VzKeyboardKind::None => Ok(()),
+        VzKeyboardKind::Usb => {
+            // SAFETY: default USB keyboard construction is valid.
+            let device = unsafe { VZUSBKeyboardConfiguration::new() };
+            let device_ref: &VZKeyboardConfiguration = &device;
+            let array = NSArray::from_slice(&[device_ref]);
+            // SAFETY: array contains one valid keyboard.
+            unsafe { config.setKeyboards(&array) };
+            Ok(())
+        }
+        VzKeyboardKind::Mac => {
+            // SAFETY: default Mac keyboard construction is valid.
+            let device = unsafe { VZMacKeyboardConfiguration::new() };
+            let device_ref: &VZKeyboardConfiguration = &device;
+            let array = NSArray::from_slice(&[device_ref]);
+            // SAFETY: array contains one valid keyboard.
+            unsafe { config.setKeyboards(&array) };
+            Ok(())
+        }
+    }
+}
+
+fn install_balloon(spec: &VzSpec, config: &VZVirtualMachineConfiguration) -> Result<(), VzError> {
+    if !spec.balloon {
+        return Ok(());
+    }
+    // SAFETY: default balloon device construction is valid.
+    let device = unsafe { VZVirtioTraditionalMemoryBalloonDeviceConfiguration::new() };
+    let device_ref: &VZMemoryBalloonDeviceConfiguration = &device;
+    let array = NSArray::from_slice(&[device_ref]);
+    // SAFETY: array contains one valid balloon device.
+    unsafe { config.setMemoryBalloonDevices(&array) };
+    Ok(())
+}
+
+fn install_socket(spec: &VzSpec, config: &VZVirtualMachineConfiguration) -> Result<(), VzError> {
+    if !spec.socket {
+        return Ok(());
+    }
+    // SAFETY: default vsock device construction is valid.
+    let device = unsafe { VZVirtioSocketDeviceConfiguration::new() };
+    let device_ref: &VZSocketDeviceConfiguration = &device;
+    let array = NSArray::from_slice(&[device_ref]);
+    // SAFETY: array contains one valid socket device.
+    unsafe { config.setSocketDevices(&array) };
     Ok(())
 }
 

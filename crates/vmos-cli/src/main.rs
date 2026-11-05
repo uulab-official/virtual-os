@@ -1,5 +1,5 @@
 use std::fs::OpenOptions;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
@@ -79,7 +79,9 @@ enum Commands {
         json: bool,
     },
     /// Start a virtual machine.
-    Start { name: String },
+    Start {
+        name: String,
+    },
     /// Stop a virtual machine.
     Stop {
         name: String,
@@ -89,9 +91,13 @@ enum Commands {
         timeout: u64,
     },
     /// Pause a virtual machine.
-    Pause { name: String },
+    Pause {
+        name: String,
+    },
     /// Resume a virtual machine.
-    Resume { name: String },
+    Resume {
+        name: String,
+    },
     /// Delete a virtual machine.
     Delete {
         name: String,
@@ -99,7 +105,10 @@ enum Commands {
         force: bool,
     },
     /// Clone a virtual machine.
-    Clone { source: String, target: String },
+    Clone {
+        source: String,
+        target: String,
+    },
     /// Modify CPU/memory of a stopped VM.
     Modify {
         name: String,
@@ -113,6 +122,14 @@ enum Commands {
         name: String,
         #[arg(long, default_value_t = 200)]
         lines: usize,
+    },
+    Save {
+        name: String,
+        path: PathBuf,
+    },
+    Restore {
+        name: String,
+        path: PathBuf,
     },
     /// Snapshot management.
     Snapshot {
@@ -475,6 +492,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Commands::Clone { source, target } => cmd_clone(&cli, source, target),
         Commands::Modify { name, cpus, memory } => cmd_modify(&cli, name, *cpus, *memory),
         Commands::Logs { name, lines } => cmd_logs(&cli, name, *lines),
+        Commands::Save { name, path } => cmd_save(&cli, name, path),
+        Commands::Restore { name, path } => cmd_restore(&cli, name, path),
         Commands::Snapshot { .. } => cmd_snapshot(&cli, &cli.command),
         Commands::Disk { .. } => cmd_disk(&cli, &cli.command),
         Commands::Daemon { .. } => cmd_daemon(&cli, &cli.command),
@@ -653,6 +672,28 @@ fn cmd_modify(
         result.vm.config.cpus,
         vmos_core::util::format_size(result.vm.config.memory_mib * 1024 * 1024)
     );
+    Ok(())
+}
+
+fn cmd_save(cli: &Cli, name: &str, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let mut client = ensure_daemon(cli)?;
+    let params = vmos_client::VmSaveParams {
+        name: name.to_string(),
+        path: path.to_path_buf(),
+    };
+    let _: serde_json::Value = client.call_long("vm.save", &params)?;
+    println!("saved {name} to {}", path.display());
+    Ok(())
+}
+
+fn cmd_restore(cli: &Cli, name: &str, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let mut client = ensure_daemon(cli)?;
+    let params = vmos_client::VmRestoreParams {
+        name: name.to_string(),
+        path: path.to_path_buf(),
+    };
+    let result: vmos_client::VmGetResult = client.call_long("vm.restore", &params)?;
+    println!("{}: {}", result.vm.name, result.vm.state);
     Ok(())
 }
 

@@ -23,8 +23,8 @@ use vmos_client::protocol::{
     DiskAddParams, DiskCloneParams, DiskListParams, DiskListResult, DiskRemoveParams,
     DiskResizeParams, DiskResult, Empty, EventPollParams, LogsParams, PingResult, RpcError,
     RpcRequest, RpcResponse, SnapshotCreateParams, SnapshotListParams, SnapshotNameParams,
-    VmCloneParams, VmCreateParams, VmDeleteParams, VmModifyParams, VmNameParams, VmStopParams,
-    MAX_LINE_BYTES, PROTOCOL_VERSION,
+    VmCloneParams, VmCreateParams, VmDeleteParams, VmModifyParams, VmNameParams, VmRestoreParams,
+    VmSaveParams, VmStopParams, MAX_LINE_BYTES, PROTOCOL_VERSION,
 };
 use vmos_core::{EventKind, VmStore};
 
@@ -443,6 +443,21 @@ fn dispatch(daemon: &Arc<Daemon>, method: &str, params: Value) -> Result<Dispatc
             to_value(
                 daemon
                     .logs(&params.name, params.lines)
+                    .map_err(|error| error.to_rpc_error())?,
+            )?
+        }
+        methods::VM_SAVE => {
+            let params: VmSaveParams = parse_params(params)?;
+            daemon
+                .save_state(&params.name, &params.path)
+                .map_err(|error| error.to_rpc_error())?;
+            json!({ "ok": true, "name": params.name, "path": params.path })
+        }
+        methods::VM_RESTORE => {
+            let params: VmRestoreParams = parse_params(params)?;
+            to_value(
+                daemon
+                    .restore_state(&params.name, &params.path)
                     .map_err(|error| error.to_rpc_error())?,
             )?
         }

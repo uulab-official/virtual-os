@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -154,6 +154,7 @@ impl Daemon {
         }
         options.shares = params.shares.clone();
         options.tags = params.tags.clone();
+        options.devices = params.devices.clone();
 
         let vm = self.store.create(options)?;
         self.events
@@ -321,6 +322,66 @@ impl Daemon {
         let memory = params.memory_mib.unwrap_or(vm.config.memory_mib);
         vm.set_resources(cpus, memory)?;
         Ok(VmGetResult { vm: vm.info()? })
+    }
+
+    pub fn save_state(&self, name: &str, path: &Path) -> Result<(), DaemonError> {
+        let _ops = self.lock_ops();
+        let vm = self.store.open(name)?;
+        let machine = self
+            .machine(name)
+            .ok_or_else(|| DaemonError::NotRunning(name.to_string()))?;
+        if machine.state() == VzState::Running {
+            machine.pause()?;
+            self.write_runtime(&vm, RunState::Paused, None)?;
+        }
+        machine.save_state(path)?;
+        let _ = machine.stop();
+        self.machines().remove(name);
+        self.write_runtime(&vm, RunState::Stopped, None)?;
+        self.events
+            .publish(Some(name), EventKind::VmStopped { forced: true });
+        tracing::info!(vm = name, path = %path.display(), "saved VM state");
+        Ok(())
+    }
+
+    pub fn restore_state(&self, name: &str, path: &Path) -> Result<VmGetResult, DaemonError> {
+        let _ops = self.lock_ops();
+        let vm = self.store.open(name)?;
+        if let Some(machine) = self.machine(name) {
+            if machine.state().is_active() {
+                return Err(DaemonError::Core(vmos_core::CoreError::VmBusy {
+                    name: name.to_string(),
+                    state: machine.state().label().to_string(),
+                    action: "restore",
+                }));
+            }
+            self.machines().remove(name);
+        }
+        self.write_runtime(&vm, RunState::Starting, None)?;
+        let spec = spec_for(&vm)?;
+        let machine = match VzMachine::new(spec, format!("com.uulab.vmos.vm.{name}")) {
+            Ok(machine) => Arc::new(machine),
+            Err(error) => {
+                let message = error.to_string();
+                self.write_runtime(&vm, RunState::Error, Some(message.clone()))?;
+                return Err(error.into());
+            }
+        };
+        if let Err(error) = machine.restore_state(path) {
+            let message = error.to_string();
+            self.write_runtime(&vm, RunState::Error, Some(message.clone()))?;
+            return Err(error.into());
+        }
+        if let Err(error) = machine.start() {
+            let message = error.to_string();
+            self.write_runtime(&vm, RunState::Error, Some(message.clone()))?;
+            return Err(error.into());
+        }
+        self.machines().insert(name.to_string(), machine);
+        self.write_runtime(&vm, RunState::Running, None)?;
+        self.events.publish(Some(name), EventKind::VmStarted);
+        tracing::info!(vm = name, path = %path.display(), "restored VM state");
+        self.get(name)
     }
 
     pub fn logs(&self, name: &str, lines: usize) -> Result<LogsResult, DaemonError> {
@@ -725,10 +786,26 @@ fn spec_for(vm: &Vm) -> Result<VzSpec, DaemonError> {
         .as_ref()
         .map(|path| vmos_core::config::resolve_vm_path(&vm.dir, path));
 
-    let graphics = if matches!(config.boot, vmos_core::BootConfig::MacOs { .. }) {
-        Some(VzGraphics::default())
+    let graphics = if config.devices.graphics.enabled {
+        Some(VzGraphics {
+            width: config.devices.graphics.width as usize,
+            height: config.devices.graphics.height as usize,
+            pixels_per_inch: config.devices.graphics.pixels_per_inch as usize,
+        })
     } else {
         None
+    };
+
+    use vmos_vz::{VzConsolePort, VzKeyboardKind, VzPointingKind};
+    let pointing = match config.devices.pointing.kind {
+        vmos_core::config::PointingKind::Usb => VzPointingKind::Usb,
+        vmos_core::config::PointingKind::Trackpad => VzPointingKind::Trackpad,
+        vmos_core::config::PointingKind::None => VzPointingKind::None,
+    };
+    let keyboard = match config.devices.keyboard.kind {
+        vmos_core::config::KeyboardKind::Usb => VzKeyboardKind::Usb,
+        vmos_core::config::KeyboardKind::Mac => VzKeyboardKind::Mac,
+        vmos_core::config::KeyboardKind::None => VzKeyboardKind::None,
     };
 
     Ok(VzSpec {
@@ -741,5 +818,25 @@ fn spec_for(vm: &Vm) -> Result<VzSpec, DaemonError> {
         serial,
         platform_identifier,
         graphics,
+        audio: config.devices.audio.enabled,
+        usb: config.devices.usb.enabled,
+        pointing,
+        keyboard,
+        console_ports: config
+            .devices
+            .console
+            .ports
+            .iter()
+            .map(|port| VzConsolePort {
+                name: port.name.clone(),
+                log: port
+                    .log
+                    .clone()
+                    .map(|p| vmos_core::config::resolve_vm_path(&vm.dir, &p)),
+            })
+            .collect(),
+        balloon: config.devices.balloon.enabled,
+        socket: config.devices.socket.enabled,
+        entropy: config.devices.entropy,
     })
 }

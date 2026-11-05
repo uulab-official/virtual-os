@@ -35,6 +35,8 @@ pub mod methods {
     pub const VM_CLONE: &str = "vm.clone";
     pub const VM_MODIFY: &str = "vm.modify";
     pub const VM_LOGS: &str = "vm.logs";
+    pub const VM_SAVE: &str = "vm.save";
+    pub const VM_RESTORE: &str = "vm.restore";
 
     pub const SNAPSHOT_LIST: &str = "snapshot.list";
     pub const SNAPSHOT_CREATE: &str = "snapshot.create";
@@ -239,6 +241,8 @@ pub struct VmCreateParams {
     #[serde(default)]
     pub serial: SerialConfig,
     #[serde(default)]
+    pub devices: vmos_core::DevicesConfig,
+    #[serde(default)]
     pub tags: BTreeMap<String, String>,
 }
 
@@ -254,6 +258,7 @@ impl VmCreateParams {
             networks: vec![NetworkSpec::nat()],
             shares: Vec::new(),
             serial: SerialConfig::default(),
+            devices: vmos_core::DevicesConfig::default(),
             tags: BTreeMap::new(),
         }
     }
@@ -313,6 +318,18 @@ pub struct VmGetResult {
 pub struct VmStateResult {
     pub name: String,
     pub state: RunState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VmSaveParams {
+    pub name: String,
+    pub path: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VmRestoreParams {
+    pub name: String,
+    pub path: PathBuf,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

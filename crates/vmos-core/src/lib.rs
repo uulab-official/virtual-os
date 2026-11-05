@@ -39,8 +39,10 @@ pub mod time;
 pub mod util;
 
 pub use config::{
-    BootConfig, DiskConfig, NetworkConfig, NetworkMode, PlatformConfig, SerialConfig, ShareConfig,
-    VmConfig, VmId, SCHEMA_VERSION,
+    AudioConfig, BalloonConfig, BootConfig, ConsoleConfig, ConsolePortConfig, DevicesConfig,
+    DiskConfig, GraphicsConfig, KeyboardConfig, KeyboardKind, NetworkConfig, NetworkMode,
+    PlatformConfig, PointingConfig, PointingKind, SerialConfig, ShareConfig, SocketConfig,
+    UsbConfig, VmConfig, VmId, SCHEMA_VERSION,
 };
 pub use disk::{DiskFormat, DiskInfo};
 pub use error::{CoreError, Result};
