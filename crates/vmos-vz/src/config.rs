@@ -128,7 +128,7 @@ pub struct VzSpec {
     pub shares: Vec<VzShare>,
     pub serial: Option<VzSerial>,
     pub platform_identifier: Option<PathBuf>,
-    pub graphics: Option<VzGraphics>,
+    pub graphics: Vec<VzGraphics>,
     pub audio: bool,
     pub usb: bool,
     pub pointing: VzPointingKind,
@@ -300,7 +300,7 @@ fn install_platform(spec: &VzSpec, config: &VZVirtualMachineConfiguration) -> Re
             // SAFETY: platform is a VZMacPlatformConfiguration subclass.
             unsafe { config.setPlatform(platform_ref) };
 
-            if spec.graphics.is_some() {
+            if !spec.graphics.is_empty() {
                 install_mac_graphics(spec, config)?;
             }
         }
@@ -574,21 +574,29 @@ fn install_mac_graphics(
     spec: &VzSpec,
     config: &VZVirtualMachineConfiguration,
 ) -> Result<(), VzError> {
-    let graphics = spec.graphics.unwrap_or_default();
-    // SAFETY: display construction only uses plain integers.
-    let display = unsafe {
-        VZMacGraphicsDisplayConfiguration::initWithWidthInPixels_heightInPixels_pixelsPerInch(
-            VZMacGraphicsDisplayConfiguration::alloc(),
-            graphics.width as isize,
-            graphics.height as isize,
-            graphics.pixels_per_inch as isize,
-        )
-    };
-    let displays = NSArray::from_slice(&[&*display]);
+    if spec.graphics.is_empty() {
+        return Ok(());
+    }
+    let mut displays = Vec::with_capacity(spec.graphics.len());
+    for graphics in &spec.graphics {
+        // SAFETY: display construction only uses plain integers.
+        let display = unsafe {
+            VZMacGraphicsDisplayConfiguration::initWithWidthInPixels_heightInPixels_pixelsPerInch(
+                VZMacGraphicsDisplayConfiguration::alloc(),
+                graphics.width as isize,
+                graphics.height as isize,
+                graphics.pixels_per_inch as isize,
+            )
+        };
+        displays.push(display);
+    }
+    let display_refs: Vec<&VZMacGraphicsDisplayConfiguration> =
+        displays.iter().map(|d| &**d).collect();
+    let displays_array = NSArray::from_slice(&display_refs);
     // SAFETY: default macOS graphics device construction is valid.
     let device = unsafe { VZMacGraphicsDeviceConfiguration::new() };
-    // SAFETY: array contains one valid display.
-    unsafe { device.setDisplays(&displays) };
+    // SAFETY: array contains valid displays.
+    unsafe { device.setDisplays(&displays_array) };
     let device_ref: &VZGraphicsDeviceConfiguration = &device;
     let array = NSArray::from_slice(&[device_ref]);
     // SAFETY: array contains one valid graphics device.
@@ -597,26 +605,31 @@ fn install_mac_graphics(
 }
 
 fn install_graphics(spec: &VzSpec, config: &VZVirtualMachineConfiguration) -> Result<(), VzError> {
-    let Some(graphics) = spec.graphics else {
+    if spec.graphics.is_empty() {
         return Ok(());
-    };
-    let _ = graphics;
+    }
     if matches!(spec.boot, VzBoot::MacOs { .. }) {
         return Ok(());
     }
-    // SAFETY: scanout construction only uses plain integers.
-    let scanout = unsafe {
-        VZVirtioGraphicsScanoutConfiguration::initWithWidthInPixels_heightInPixels(
-            VZVirtioGraphicsScanoutConfiguration::alloc(),
-            graphics.width as isize,
-            graphics.height as isize,
-        )
-    };
-    let scanouts = NSArray::from_slice(&[&*scanout]);
+    let mut scanouts = Vec::with_capacity(spec.graphics.len());
+    for graphics in &spec.graphics {
+        // SAFETY: scanout construction only uses plain integers.
+        let scanout = unsafe {
+            VZVirtioGraphicsScanoutConfiguration::initWithWidthInPixels_heightInPixels(
+                VZVirtioGraphicsScanoutConfiguration::alloc(),
+                graphics.width as isize,
+                graphics.height as isize,
+            )
+        };
+        scanouts.push(scanout);
+    }
+    let scanout_refs: Vec<&VZVirtioGraphicsScanoutConfiguration> =
+        scanouts.iter().map(|s| &**s).collect();
+    let scanouts_array = NSArray::from_slice(&scanout_refs);
     // SAFETY: default virtio graphics device construction is valid.
     let device = unsafe { VZVirtioGraphicsDeviceConfiguration::new() };
-    // SAFETY: array contains one valid scanout.
-    unsafe { device.setScanouts(&scanouts) };
+    // SAFETY: array contains valid scanouts.
+    unsafe { device.setScanouts(&scanouts_array) };
     let device_ref: &VZGraphicsDeviceConfiguration = &device;
     let array = NSArray::from_slice(&[device_ref]);
     // SAFETY: array contains one valid graphics device.

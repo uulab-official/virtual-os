@@ -22,7 +22,7 @@
 //!     shares: vec![],
 //!     serial: Some(VzSerial { path: PathBuf::from("/tmp/serial.log"), append: true }),
 //!     platform_identifier: None,
-//!     graphics: None,
+//!     graphics: vec![],
 //!     audio: false,
 //!     usb: false,
 //!     pointing: vmos_vz::VzPointingKind::Usb,

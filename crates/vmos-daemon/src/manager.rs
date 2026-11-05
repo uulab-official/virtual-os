@@ -838,13 +838,19 @@ fn spec_for(vm: &Vm) -> Result<VzSpec, DaemonError> {
         .map(|path| vmos_core::config::resolve_vm_path(&vm.dir, path));
 
     let graphics = if config.devices.graphics.enabled {
-        Some(VzGraphics {
-            width: config.devices.graphics.width as usize,
-            height: config.devices.graphics.height as usize,
-            pixels_per_inch: config.devices.graphics.pixels_per_inch as usize,
-        })
+        config
+            .devices
+            .graphics
+            .effective_displays()
+            .into_iter()
+            .map(|display| VzGraphics {
+                width: display.width as usize,
+                height: display.height as usize,
+                pixels_per_inch: display.pixels_per_inch as usize,
+            })
+            .collect()
     } else {
-        None
+        Vec::new()
     };
 
     use vmos_vz::{VzConsolePort, VzKeyboardKind, VzPointingKind};

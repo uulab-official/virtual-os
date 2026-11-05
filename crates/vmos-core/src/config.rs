@@ -297,6 +297,28 @@ impl SerialConfig {
     }
 }
 
+/// A single virtual display.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DisplayConfig {
+    #[serde(default = "default_graphics_width")]
+    pub width: u32,
+    #[serde(default = "default_graphics_height")]
+    pub height: u32,
+    #[serde(default = "default_graphics_ppi")]
+    pub pixels_per_inch: u32,
+}
+
+impl Default for DisplayConfig {
+    fn default() -> Self {
+        Self {
+            width: 1920,
+            height: 1080,
+            pixels_per_inch: 80,
+        }
+    }
+}
+
 /// Graphics device configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -309,6 +331,10 @@ pub struct GraphicsConfig {
     pub height: u32,
     #[serde(default = "default_graphics_ppi")]
     pub pixels_per_inch: u32,
+    /// Additional displays. When empty, the primary width/height/pixels_per_inch
+    /// fields describe the single display.
+    #[serde(default)]
+    pub displays: Vec<DisplayConfig>,
 }
 
 impl Default for GraphicsConfig {
@@ -318,6 +344,26 @@ impl Default for GraphicsConfig {
             width: 1920,
             height: 1080,
             pixels_per_inch: 80,
+            displays: Vec::new(),
+        }
+    }
+}
+
+impl GraphicsConfig {
+    /// Resolve the configured displays, falling back to the primary fields.
+    pub fn effective_displays(&self) -> Vec<DisplayConfig> {
+        if self.displays.is_empty() {
+            vec![DisplayConfig {
+                width: if self.width == 0 { 1920 } else { self.width },
+                height: if self.height == 0 { 1080 } else { self.height },
+                pixels_per_inch: if self.pixels_per_inch == 0 {
+                    80
+                } else {
+                    self.pixels_per_inch
+                },
+            }]
+        } else {
+            self.displays.clone()
         }
     }
 }

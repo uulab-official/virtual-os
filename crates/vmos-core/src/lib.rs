@@ -40,7 +40,7 @@ pub mod util;
 
 pub use config::{
     AudioConfig, BalloonConfig, BootConfig, ConsoleConfig, ConsolePortConfig, DevicesConfig,
-    DiskConfig, GraphicsConfig, KeyboardConfig, KeyboardKind, NetworkConfig, NetworkMode,
+    DisplayConfig, DiskConfig, GraphicsConfig, KeyboardConfig, KeyboardKind, NetworkConfig, NetworkMode,
     PlatformConfig, PointingConfig, PointingKind, SerialConfig, ShareConfig, SocketConfig,
     UsbConfig, VmConfig, VmId, SCHEMA_VERSION,
 };
