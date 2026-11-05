@@ -123,6 +123,9 @@ enum Commands {
         #[arg(long, default_value_t = 200)]
         lines: usize,
     },
+    Stats {
+        name: String,
+    },
     Install {
         name: String,
         restore_image: PathBuf,
@@ -511,6 +514,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Commands::Clone { source, target } => cmd_clone(&cli, source, target),
         Commands::Modify { name, cpus, memory } => cmd_modify(&cli, name, *cpus, *memory),
         Commands::Logs { name, lines } => cmd_logs(&cli, name, *lines),
+        Commands::Stats { name } => cmd_stats(&cli, name),
         Commands::Save { name, path } => cmd_save(&cli, name, path),
         Commands::Restore { name, path } => cmd_restore(&cli, name, path),
         Commands::Backup { name, path } => cmd_backup(&cli, name, path),
@@ -776,6 +780,23 @@ fn cmd_restore_backup(
     } else {
         println!("restored backup to {}", vms_dir.display());
     }
+    Ok(())
+}
+
+fn cmd_stats(cli: &Cli, name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let mut client = ensure_daemon(cli)?;
+    let result: vmos_client::VmStatsResult = client.call("vm.stats", &vmos_client::VmStatsParams {
+        name: name.to_string(),
+    })?;
+    println!("name:   {}", result.name);
+    println!("state:  {}", result.state);
+    println!("cpus:   {}", result.cpus);
+    println!("memory: {}", vmos_core::util::format_size(result.memory_mib * 1024 * 1024));
+    println!("disks:");
+    for disk in result.disks {
+        println!("  {}  {}", disk.id, vmos_core::util::format_size(disk.size_bytes));
+    }
+    println!("serial log bytes: {}", result.serial_log_bytes);
     Ok(())
 }
 

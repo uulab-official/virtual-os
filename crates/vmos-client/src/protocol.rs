@@ -35,6 +35,7 @@ pub mod methods {
     pub const VM_CLONE: &str = "vm.clone";
     pub const VM_MODIFY: &str = "vm.modify";
     pub const VM_LOGS: &str = "vm.logs";
+    pub const VM_STATS: &str = "vm.stats";
     pub const VM_INSTALL: &str = "vm.install";
     pub const VM_SAVE: &str = "vm.save";
     pub const VM_RESTORE: &str = "vm.restore";
@@ -338,6 +339,21 @@ pub struct VmRestoreParams {
 pub struct VmInstallParams {
     pub name: String,
     pub restore_image: PathBuf,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VmStatsParams {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VmStatsResult {
+    pub name: String,
+    pub state: vmos_core::RunState,
+    pub cpus: u32,
+    pub memory_mib: u64,
+    pub disks: Vec<DiskInfo>,
+    pub serial_log_bytes: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

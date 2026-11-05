@@ -422,6 +422,21 @@ impl Daemon {
         self.get(name)
     }
 
+    pub fn stats(&self, name: &str) -> Result<vmos_client::VmStatsResult, DaemonError> {
+        let vm = self.store.open(name)?;
+        let serial_bytes = std::fs::metadata(vm.serial_log_path())
+            .map(|m| m.len())
+            .unwrap_or(0);
+        Ok(vmos_client::VmStatsResult {
+            name: vm.config.name.clone(),
+            state: vm.effective_runtime().state,
+            cpus: vm.config.cpus,
+            memory_mib: vm.config.memory_mib,
+            disks: vm.disk_infos(),
+            serial_log_bytes: serial_bytes,
+        })
+    }
+
     pub fn logs(&self, name: &str, lines: usize) -> Result<LogsResult, DaemonError> {
         let vm = self.store.open(name)?;
         let path = vm.serial_log_path();
