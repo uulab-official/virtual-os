@@ -38,6 +38,8 @@ pub struct Snapshot {
     pub created_at: Timestamp,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
     /// Complete VM definition at capture time.
     pub config: VmConfig,
     pub disks: Vec<SnapshotDisk>,
@@ -53,6 +55,7 @@ impl Snapshot {
         disks: Vec<SnapshotDisk>,
         files: Vec<SnapshotFile>,
         description: Option<String>,
+        parent: Option<String>,
     ) -> Self {
         Self {
             schema_version: SCHEMA_VERSION,
@@ -60,6 +63,7 @@ impl Snapshot {
             vm_id: config.id.to_string(),
             created_at: Timestamp::now(),
             description,
+            parent,
             config,
             disks,
             files,
@@ -79,6 +83,7 @@ impl Snapshot {
             name: self.name.clone(),
             created_at: self.created_at,
             description: self.description.clone(),
+            parent: self.parent.clone(),
             disk_count: self.disks.len(),
             total_bytes: self.total_bytes(),
             state: self.config.boot.kind().to_string(),
@@ -92,6 +97,8 @@ pub struct SnapshotSummary {
     pub created_at: Timestamp,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
     pub disk_count: usize,
     pub total_bytes: u64,
     /// Boot mode at capture time (`linux`, `efi`, `macos`).

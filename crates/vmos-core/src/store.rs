@@ -1036,6 +1036,7 @@ impl Vm {
                 disks,
                 files,
                 description,
+                None,
             );
             util::write_json(&tmp_dir.join(SNAPSHOT_FILE), &snapshot)?;
             Ok(snapshot)
