@@ -785,16 +785,26 @@ fn cmd_restore_backup(
 
 fn cmd_stats(cli: &Cli, name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut client = ensure_daemon(cli)?;
-    let result: vmos_client::VmStatsResult = client.call("vm.stats", &vmos_client::VmStatsParams {
-        name: name.to_string(),
-    })?;
+    let result: vmos_client::VmStatsResult = client.call(
+        "vm.stats",
+        &vmos_client::VmStatsParams {
+            name: name.to_string(),
+        },
+    )?;
     println!("name:   {}", result.name);
     println!("state:  {}", result.state);
     println!("cpus:   {}", result.cpus);
-    println!("memory: {}", vmos_core::util::format_size(result.memory_mib * 1024 * 1024));
+    println!(
+        "memory: {}",
+        vmos_core::util::format_size(result.memory_mib * 1024 * 1024)
+    );
     println!("disks:");
     for disk in result.disks {
-        println!("  {}  {}", disk.id, vmos_core::util::format_size(disk.size_bytes));
+        println!(
+            "  {}  {}",
+            disk.id,
+            vmos_core::util::format_size(disk.size_bytes)
+        );
     }
     println!("serial log bytes: {}", result.serial_log_bytes);
     Ok(())

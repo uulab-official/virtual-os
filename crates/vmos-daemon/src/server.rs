@@ -24,8 +24,8 @@ use vmos_client::protocol::{
     DiskRemoveParams, DiskResizeParams, DiskResult, Empty, EventPollParams, LogsParams, PingResult,
     RpcError, RpcRequest, RpcResponse, SnapshotCreateParams, SnapshotListParams,
     SnapshotNameParams, VmCloneParams, VmCreateParams, VmDeleteParams, VmInstallParams,
-    VmModifyParams, VmNameParams, VmRestoreParams, VmSaveParams, VmStatsParams, VmStopParams, MAX_LINE_BYTES,
-    PROTOCOL_VERSION,
+    VmModifyParams, VmNameParams, VmRestoreParams, VmSaveParams, VmStatsParams, VmStopParams,
+    MAX_LINE_BYTES, PROTOCOL_VERSION,
 };
 use vmos_core::{EventKind, VmStore};
 
@@ -449,7 +449,11 @@ fn dispatch(daemon: &Arc<Daemon>, method: &str, params: Value) -> Result<Dispatc
         }
         methods::VM_STATS => {
             let params: VmStatsParams = parse_params(params)?;
-            to_value(daemon.stats(&params.name).map_err(|error| error.to_rpc_error())?)?
+            to_value(
+                daemon
+                    .stats(&params.name)
+                    .map_err(|error| error.to_rpc_error())?,
+            )?
         }
         methods::VM_LOGS => {
             let params: LogsParams = parse_params(params)?;
