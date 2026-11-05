@@ -135,6 +135,15 @@ enum Commands {
         name: String,
         path: PathBuf,
     },
+    Backup {
+        name: String,
+        path: PathBuf,
+    },
+    RestoreBackup {
+        path: PathBuf,
+        #[arg(long)]
+        name: Option<String>,
+    },
     /// Snapshot management.
     Snapshot {
         #[command(subcommand)]
@@ -504,6 +513,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Commands::Logs { name, lines } => cmd_logs(&cli, name, *lines),
         Commands::Save { name, path } => cmd_save(&cli, name, path),
         Commands::Restore { name, path } => cmd_restore(&cli, name, path),
+        Commands::Backup { name, path } => cmd_backup(&cli, name, path),
+        Commands::RestoreBackup { path, name } => cmd_restore_backup(&cli, path, name.as_deref()),
         Commands::Install {
             name,
             restore_image,
@@ -723,6 +734,44 @@ fn cmd_install(
     };
     let result: vmos_client::VmGetResult = client.call_long("vm.install", &params)?;
     println!("{}: {}", result.vm.name, result.vm.state);
+    Ok(())
+}
+
+fn cmd_backup(cli: &Cli, name: &str, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let root = store_root(cli);
+    let vms_dir = root.join("vms");
+    let status = std::process::Command::new("tar")
+        .arg("czf")
+        .arg(path)
+        .arg("-C")
+        .arg(&vms_dir)
+        .arg(name)
+        .status()?;
+    if !status.success() {
+        return Err("backup failed".into());
+    }
+    println!("backed up {name} to {}", path.display());
+    Ok(())
+}
+
+fn cmd_restore_backup(cli: &Cli, path: &Path, name: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+    let root = store_root(cli);
+    let vms_dir = root.join("vms");
+    std::fs::create_dir_all(&vms_dir)?;
+    let status = std::process::Command::new("tar")
+        .arg("xzf")
+        .arg(path)
+        .arg("-C")
+        .arg(&vms_dir)
+        .status()?;
+    if !status.success() {
+        return Err("restore failed".into());
+    }
+    if let Some(name) = name {
+        println!("restored backup to {name}");
+    } else {
+        println!("restored backup to {}", vms_dir.display());
+    }
     Ok(())
 }
 
