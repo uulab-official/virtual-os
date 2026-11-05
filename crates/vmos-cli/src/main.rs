@@ -502,7 +502,10 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Commands::Logs { name, lines } => cmd_logs(&cli, name, *lines),
         Commands::Save { name, path } => cmd_save(&cli, name, path),
         Commands::Restore { name, path } => cmd_restore(&cli, name, path),
-        Commands::Install { name, restore_image } => cmd_install(&cli, name, restore_image),
+        Commands::Install {
+            name,
+            restore_image,
+        } => cmd_install(&cli, name, restore_image),
         Commands::Snapshot { .. } => cmd_snapshot(&cli, &cli.command),
         Commands::Disk { .. } => cmd_disk(&cli, &cli.command),
         Commands::Daemon { .. } => cmd_daemon(&cli, &cli.command),
@@ -706,7 +709,11 @@ fn cmd_restore(cli: &Cli, name: &str, path: &Path) -> Result<(), Box<dyn std::er
     Ok(())
 }
 
-fn cmd_install(cli: &Cli, name: &str, restore_image: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn cmd_install(
+    cli: &Cli,
+    name: &str,
+    restore_image: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut client = ensure_daemon(cli)?;
     let params = vmos_client::VmInstallParams {
         name: name.to_string(),

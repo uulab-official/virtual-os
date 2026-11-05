@@ -22,9 +22,10 @@ use vmos_client::methods;
 use vmos_client::protocol::{
     DiskAddParams, DiskCloneParams, DiskCompactParams, DiskListParams, DiskListResult,
     DiskRemoveParams, DiskResizeParams, DiskResult, Empty, EventPollParams, LogsParams, PingResult,
-    RpcError, RpcRequest, RpcResponse, SnapshotCreateParams, SnapshotListParams, SnapshotNameParams,
-    VmCloneParams, VmCreateParams, VmDeleteParams, VmInstallParams, VmModifyParams, VmNameParams,
-    VmRestoreParams, VmSaveParams, VmStopParams, MAX_LINE_BYTES, PROTOCOL_VERSION,
+    RpcError, RpcRequest, RpcResponse, SnapshotCreateParams, SnapshotListParams,
+    SnapshotNameParams, VmCloneParams, VmCreateParams, VmDeleteParams, VmInstallParams,
+    VmModifyParams, VmNameParams, VmRestoreParams, VmSaveParams, VmStopParams, MAX_LINE_BYTES,
+    PROTOCOL_VERSION,
 };
 use vmos_core::{EventKind, VmStore};
 

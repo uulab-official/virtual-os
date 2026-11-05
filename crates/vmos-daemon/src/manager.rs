@@ -384,7 +384,11 @@ impl Daemon {
         self.get(name)
     }
 
-    pub fn install_macos(&self, name: &str, restore_image: &Path) -> Result<VmGetResult, DaemonError> {
+    pub fn install_macos(
+        &self,
+        name: &str,
+        restore_image: &Path,
+    ) -> Result<VmGetResult, DaemonError> {
         let _ops = self.lock_ops();
         let vm = self.store.open(name)?;
         if let Some(machine) = self.machine(name) {

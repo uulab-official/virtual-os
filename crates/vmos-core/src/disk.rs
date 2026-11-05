@@ -220,7 +220,6 @@ pub fn inspect(id: &str, path: &Path, read_only: bool, declared_size: u64) -> Re
     })
 }
 
-
 /// Rewrite a raw image so that zero-filled blocks become sparse holes.
 pub fn compact(path: &Path) -> Result<()> {
     let size = std::fs::metadata(path)
@@ -237,14 +236,17 @@ pub fn compact(path: &Path) -> Result<()> {
         .truncate(true)
         .open(&tmp)
         .map_err(|error| CoreError::io(&tmp, error))?;
-    dst.set_len(size).map_err(|error| CoreError::io(&tmp, error))?;
+    dst.set_len(size)
+        .map_err(|error| CoreError::io(&tmp, error))?;
 
     const CHUNK: usize = 1024 * 1024;
     let mut buf = vec![0u8; CHUNK];
     let mut pos = 0u64;
     while pos < size {
         let to_read = ((size - pos) as usize).min(CHUNK);
-        let n = src.read(&mut buf[..to_read]).map_err(|error| CoreError::io(path, error))?;
+        let n = src
+            .read(&mut buf[..to_read])
+            .map_err(|error| CoreError::io(path, error))?;
         if n == 0 {
             break;
         }

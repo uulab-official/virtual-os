@@ -314,7 +314,10 @@ impl VzMachine {
         match slot.take() {
             Some(Ok(())) => Ok(()),
             Some(Err(message)) => Err(VzError::Other(message)),
-            None => Err(VzError::timeout("installing macOS", Duration::from_secs(3600))),
+            None => Err(VzError::timeout(
+                "installing macOS",
+                Duration::from_secs(3600),
+            )),
         }
     }
 
