@@ -48,5 +48,5 @@ pub use event::{Event, EventKind};
 pub use name::{validate_disk_id, validate_share_tag, validate_snapshot_name, validate_vm_name};
 pub use runtime::{RunState, RuntimeState};
 pub use snapshot::{Snapshot, SnapshotDisk, SnapshotFile, SnapshotSummary};
-pub use store::{CreateVmOptions, NewDisk, Vm, VmStore, VmSummary};
+pub use store::{CreateVmOptions, NewDisk, NewNetwork, Vm, VmInfo, VmStore, VmSummary};
 pub use time::Timestamp;

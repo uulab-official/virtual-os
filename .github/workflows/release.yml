@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: Build macOS release
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --workspace --release
+      - name: Sign binaries
+        run: ./scripts/sign-dev.sh release
+      - name: Package
+        run: |
+          cd target/release
+          tar czf ../../virtual-os-macos-${{ github.ref_name }}.tar.gz \
+            vmos vmos-daemon libvmos_sdk.* 2>/dev/null || \
+          tar czf ../../virtual-os-macos-${{ github.ref_name }}.tar.gz vmos vmos-daemon
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: virtual-os-macos
+          path: virtual-os-macos-*.tar.gz
+      - name: GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: virtual-os-macos-*.tar.gz

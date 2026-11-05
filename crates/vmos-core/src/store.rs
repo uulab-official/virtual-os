@@ -48,6 +48,39 @@ impl NewDisk {
     }
 }
 
+/// New network request used by `create`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewNetwork {
+    pub mode: crate::config::NetworkMode,
+    /// Optional MAC address. Generated when absent.
+    pub mac: Option<String>,
+}
+
+impl NewNetwork {
+    pub fn nat() -> Self {
+        Self {
+            mode: crate::config::NetworkMode::Nat,
+            mac: None,
+        }
+    }
+
+    pub fn bridged(interface: Option<String>) -> Self {
+        Self {
+            mode: crate::config::NetworkMode::Bridged { interface },
+            mac: None,
+        }
+    }
+
+    pub fn with_mode(mode: crate::config::NetworkMode) -> Self {
+        Self { mode, mac: None }
+    }
+
+    pub fn with_mac(mut self, mac: impl Into<String>) -> Self {
+        self.mac = Some(mac.into());
+        self
+    }
+}
+
 /// Input for creating a VM.
 #[derive(Debug, Clone)]
 pub struct CreateVmOptions {
@@ -57,8 +90,9 @@ pub struct CreateVmOptions {
     pub memory_mib: u64,
     pub boot: BootConfig,
     pub disks: Vec<NewDisk>,
-    pub networks: Vec<crate::config::NetworkMode>,
+    pub networks: Vec<NewNetwork>,
     pub shares: Vec<crate::config::ShareConfig>,
+    pub serial: crate::config::SerialConfig,
     pub tags: std::collections::BTreeMap<String, String>,
 }
 
@@ -71,8 +105,9 @@ impl CreateVmOptions {
             memory_mib: 2048,
             boot,
             disks: Vec::new(),
-            networks: vec![crate::config::NetworkMode::Nat],
+            networks: vec![NewNetwork::nat()],
             shares: Vec::new(),
+            serial: crate::config::SerialConfig::default(),
             tags: Default::default(),
         }
     }
@@ -98,12 +133,22 @@ impl CreateVmOptions {
     }
 
     pub fn with_network(mut self, mode: crate::config::NetworkMode) -> Self {
-        self.networks.push(mode);
+        self.networks.push(NewNetwork::with_mode(mode));
+        self
+    }
+
+    pub fn with_network_spec(mut self, network: NewNetwork) -> Self {
+        self.networks.push(network);
         self
     }
 
     pub fn with_share(mut self, share: crate::config::ShareConfig) -> Self {
         self.shares.push(share);
+        self
+    }
+
+    pub fn with_serial(mut self, serial: crate::config::SerialConfig) -> Self {
+        self.serial = serial;
         self
     }
 }
@@ -304,6 +349,7 @@ impl VmStore {
             );
             config.display_name = options.display_name.clone();
             config.tags = options.tags.clone();
+            config.serial = options.serial.clone();
 
             // Generic platform identity for Linux and EFI guests, persisted so
             // the guest sees a stable machine identifier across boots.
@@ -358,10 +404,18 @@ impl VmStore {
                 let _ = index;
             }
 
-            for (index, mode) in options.networks.iter().enumerate() {
-                config
-                    .networks
-                    .push(NetworkConfig::new(format!("net{index}"), mode.clone()));
+            for (index, network) in options.networks.iter().enumerate() {
+                let mut network_config =
+                    NetworkConfig::new(format!("net{index}"), network.mode.clone());
+                if let Some(mac) = &network.mac {
+                    let normalized = crate::net::normalize_mac(mac).map_err(|reason| {
+                        CoreError::invalid_config(format!(
+                            "network net{index} has invalid MAC: {reason}"
+                        ))
+                    })?;
+                    network_config.mac = Some(normalized);
+                }
+                config.networks.push(network_config);
             }
 
             for share in &options.shares {

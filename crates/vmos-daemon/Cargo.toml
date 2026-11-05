@@ -1,5 +1,6 @@
 [package]
 name = "vmos-daemon"
+description = "Local JSON-RPC daemon that owns virtual-os guests"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,3 +9,14 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+vmos-core.workspace = true
+vmos-vz.workspace = true
+vmos-client.workspace = true
+fs2.workspace = true
+libc.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true

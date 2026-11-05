@@ -1,5 +1,6 @@
 [package]
 name = "vmos-client"
+description = "JSON-RPC client and wire protocol for the virtual-os daemon"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,3 +9,7 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+vmos-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
