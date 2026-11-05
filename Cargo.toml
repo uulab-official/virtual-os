@@ -1,0 +1,60 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/vmos-core",
+    "crates/vmos-vz",
+    "crates/vmos-client",
+    "crates/vmos-daemon",
+    "crates/vmos-cli",
+    "crates/vmos-sdk",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+license = "MIT"
+repository = "https://github.com/uulab-official/virtual-os"
+authors = ["virtual-os contributors"]
+
+[workspace.dependencies]
+vmos-core = { path = "crates/vmos-core" }
+vmos-vz = { path = "crates/vmos-vz" }
+vmos-client = { path = "crates/vmos-client" }
+vmos-daemon = { path = "crates/vmos-daemon" }
+vmos-sdk = { path = "crates/vmos-sdk" }
+
+anyhow = "1"
+block2 = "0.6"
+clap = { version = "4", features = ["derive", "env"] }
+dispatch2 = "0.3"
+fs2 = "0.4"
+libc = "0.2"
+objc2 = { version = "0.6", features = ["exception"] }
+objc2-foundation = { version = "0.3", features = [
+    "NSArray",
+    "NSData",
+    "NSError",
+    "NSFileHandle",
+    "NSString",
+    "NSURL",
+] }
+objc2-virtualization = { version = "0.3", features = ["block2", "dispatch2"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tempfile = "3"
+thiserror = "2"
+time = { version = "0.3", features = ["formatting", "parsing", "serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "z"
+strip = true
+
+[profile.dev]
+opt-level = 1
