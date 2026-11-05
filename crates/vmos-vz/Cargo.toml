@@ -1,5 +1,6 @@
 [package]
 name = "vmos-vz"
+description = "Apple Virtualization.framework backend for virtual-os"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,3 +9,12 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
+vmos-core.workspace = true
+block2.workspace = true
+dispatch2.workspace = true
+objc2.workspace = true
+objc2-foundation.workspace = true
+objc2-virtualization.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
