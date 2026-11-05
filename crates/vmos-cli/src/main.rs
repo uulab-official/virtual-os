@@ -754,7 +754,11 @@ fn cmd_backup(cli: &Cli, name: &str, path: &Path) -> Result<(), Box<dyn std::err
     Ok(())
 }
 
-fn cmd_restore_backup(cli: &Cli, path: &Path, name: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+fn cmd_restore_backup(
+    cli: &Cli,
+    path: &Path,
+    name: Option<&str>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let root = store_root(cli);
     let vms_dir = root.join("vms");
     std::fs::create_dir_all(&vms_dir)?;
